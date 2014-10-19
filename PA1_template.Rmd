@@ -7,19 +7,111 @@ output:
 
 
 ## Loading and preprocessing the data
-
-
+```{r echo=TRUE}
+# Read the data
+activity_data <- read.csv(unzip('activity.zip', 'activity.csv'))
+# Add weekdays to the activity data
+activity_data$date <- as.Date(activity_data$date)
+activity_data$weekday <- weekdays(activity_data$date) == "Saturday" |
+                         weekdays(activity_data$date) == "Sunday"
+# Change intervals to factors
+activity_data$interval_factor <- factor(activity_data$interval)
+```
 
 ## What is mean total number of steps taken per day?
+```{r total_hist,echo=TRUE}
+clean_activity_data <- activity_data[!is.na(activity_data$steps),]
+total_steps <- tapply(clean_activity_data$steps, clean_activity_data$date,
+                      sum)
+hist(total_steps, main="Total Steps Per Day", col="red", xlab="Steps",
+     ylab="Frequency")
+```
+
+```{r total_mean,echo=TRUE}
+mean(total_steps, na.rm=TRUE)
+```
+
+```{r total_median,echo=TRUE}
+median(total_steps, na.rm=TRUE)
+```
 
 
 
 ## What is the average daily activity pattern?
+```{r daily_pattern,echo=TRUE}
+average_daily_pattern <- tapply(clean_activity_data$steps,
+                                clean_activity_data$interval_factor, mean)
+plot(labels(average_daily_pattern)[[1]], average_daily_pattern, type='l',
+     main='Average Daily Pattern', xlab='time', ylab='activity measurement')
+```
 
+```{r daily_high,echo=TRUE}
+daily_high <- as.integer(which(average_daily_pattern ==
+                               max(average_daily_pattern)))
+labels(average_daily_pattern)[[1]][daily_high]
+```
 
+We have computed the time with the most activity as 0835, or 8:35 am.
 
 ## Imputing missing values
+```{r count_nas,echo=TRUE}
+length(activity_data$steps[is.na(activity_data$steps)])
+```
 
+The strategy for imputing missing values is to use the average daily activity
+pattern value for that interval.
+
+```{r hist_imputed,echo=TRUE}
+missing_idx_list <- which(is.na(activity_data$steps))
+activity_data$imputed_steps <- activity_data$steps
+for (idx_ptr in seq(missing_idx_list)) {
+    idx <- missing_idx_list[idx_ptr]
+    known_interval <- as.character(activity_data$interval[idx])
+    activity_data$imputed_steps[idx] <- average_daily_pattern[known_interval]
+}
+
+total_steps_imputed <- tapply(activity_data$imputed_steps, activity_data$date,
+                              sum)
+hist(total_steps_imputed, main="Total Steps Per Day (imputed)", col="red",
+     xlab="Steps", ylab="Frequency")
+```
+
+```{r mean_imputed,echo=TRUE}
+mean(total_steps_imputed, na.rm=TRUE)
+```
+
+```{r median_imputed,echo=TRUE}
+median(total_steps_imputed, na.rm=TRUE)
+```
+
+The mean and median values that were calculated using the imputed data set
+are extremely similar to the values reported in the first part of the
+assessment.
+
+After imputing data, there seems to be a much higher number of days that
+total between 10,000 and 15,000 steps per day.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r weekday_imputed,echo=TRUE}
+weekday_daily_pattern <- tapply(activity_data$imputed_steps[activity_data$weekday == TRUE],
+                                activity_data$interval_factor[activity_data$weekday == TRUE],
+                                mean)
+
+plot(labels(weekday_daily_pattern)[[1]], weekday_daily_pattern, type='l',
+     main='Weekday Daily Pattern', xlab='time', ylab='activity measurement')
+```
+
+```{r weekend_imputed,echo=TRUE}
+weekend_daily_pattern <- tapply(activity_data$imputed_steps[activity_data$weekday == FALSE],
+                                activity_data$interval_factor[activity_data$weekday == FALSE],
+                                mean)
+
+plot(labels(weekend_daily_pattern)[[1]], weekend_daily_pattern, type='l',
+     main='Weekend Daily Pattern', xlab='time', ylab='activity measurement')
+```
+
+Up until about 9 am or 10 am, activity levels seem to be similar.  However,
+after that time, weekend activity drops to a max of 100 while weekday
+activity stays high.  Both types experience a sharp dropoff of activity at
+about 8 pm.
